@@ -239,14 +239,243 @@ function MapSection() {
     </div>
   );
 }
-<div><div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}`, marginBottom: 16 }}><span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 16 }}>AVAILABLE RECORDS</span><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>{Object.entries(docs).map(([k, v]) => <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 10, background: c.bg.secondary, cursor: 'pointer' }}><input type="checkbox" checked={v} onChange={() => setDocs({...docs, [k]: !v})} style={{ accentColor: c.accent.primary }} /><span style={{ fontSize: 9, color: c.text.primary, textTransform: 'capitalize' }}>{k.replace(/([A-Z])/g, ' $1')}</span></label>)}</div></div><div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.accent.dim}` }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}><span style={{ fontSize: 9, color: c.text.muted }}>RECOMMENDED</span><span style={{ fontSize: 9, padding: '4px 10px', background: c.accent.glow, color: c.accent.primary }}>{getMethod().confidence}%</span></div><h3 style={{ fontSize: 16, color: c.accent.primary, margin: '0 0 12px' }}>{getMethod().name}</h3></div><div style={{ marginTop: 16 }}><span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 12 }}>ALL METHODS (SCL)</span>{delayMethods.map(m => <div key={m.id} style={{ padding: 16, marginBottom: 8, background: m.name === getMethod().name ? 'rgba(160,128,64,0.1)' : c.bg.card, border: `1px solid ${m.name === getMethod().name ? c.accent.dim : c.border.default}` }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><h4 style={{ fontSize: 12, color: c.text.primary, margin: 0 }}>{m.name}</h4><div style={{ display: 'flex', gap: 6 }}><span style={{ fontSize: 8, padding: '2px 6px', background: c.bg.secondary, color: c.text.muted }}>{m.type}</span><span style={{ fontSize: 8, padding: '2px 6px', background: m.defensibility === 'Very High' ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)', color: m.defensibility === 'Very High' ? c.status.active : c.status.warning }}>{m.defensibility}</span></div></div></div>)}</div></div>}
 
-      {toolsTab === 'claim' && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}><div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}><span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 12 }}>CLAIM READINESS</span><div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}><span style={{ fontSize: 48, color: c.status.warning }}>67</span><span style={{ fontSize: 14, color: c.text.muted }}>/100</span></div><div style={{ padding: 12, background: 'rgba(234,179,8,0.1)', border: `1px solid ${c.status.warning}` }}><span style={{ fontSize: 10, color: c.status.warning }}>MODERATE RISK</span></div></div><div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}><span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 12 }}>VULNERABILITIES</span>{[{ n: 'Incomplete as-built', s: 'HIGH' }, { n: 'Logic modifications', s: 'MEDIUM' }, { n: 'Concurrent delay', s: 'HIGH' }].map((v, i) => <div key={i} style={{ padding: 10, marginBottom: 8, background: c.bg.secondary, borderLeft: `3px solid ${v.s === 'HIGH' ? c.status.critical : c.status.warning}` }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 10, color: c.text.primary }}>{v.n}</span><span style={{ fontSize: 8, color: v.s === 'HIGH' ? c.status.critical : c.status.warning }}>{v.s}</span></div></div>)}</div></div>}
+function ToolsSection() {
+  const { toolsTab, setToolsTab } = useCtx();
+  const [qsraResults, setQsraResults] = useState(null);
+  const [dcmaResults, setDcmaResults] = useState(null);
+  const [projectName, setProjectName] = useState('');
+  const [dataDate, setDataDate] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-      {toolsTab === 'stress' && <div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}><span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 16 }}>EXPERT CROSS-EXAMINATION</span>{[{ q: 'Why Windows Analysis with update gaps?', s: 'Critical' }, { q: 'Critical path changes post-event?', s: 'High' }, { q: 'Concurrent delay apportionment?', s: 'Critical' }, { q: 'Baseline logic deficiencies?', s: 'Medium' }].map((item, i) => <div key={i} style={{ padding: 16, marginBottom: 10, background: c.bg.secondary, borderLeft: `3px solid ${item.s === 'Critical' ? c.status.critical : item.s === 'High' ? c.status.warning : c.status.info}` }}><span style={{ fontSize: 8, color: item.s === 'Critical' ? c.status.critical : c.status.warning }}>{item.s.toUpperCase()}</span><p style={{ fontSize: 10, color: c.text.primary, margin: '8px 0 0' }}>{item.q}</p></div>)}</div>}
+  const tabs = [
+    { id: 'qsra', label: 'QSRA', icon: CheckSquare },
+    { id: 'dcma', label: 'DCMA 14-PT', icon: Shield },
+  ];
+
+  const runQSRA = () => {
+    setAnalyzing(true);
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(p => {
+        if (p >= 100) {
+          clearInterval(interval);
+          const results = qsraChecks.map(ck => {
+            const rand = Math.random();
+            const val = Math.round(rand * 15);
+            const st = rand > 0.6 ? 'PASS' : rand > 0.3 ? 'AMBER' : 'FAIL';
+            return { id: ck.id, name: ck.name, threshold: ck.threshold, value: val, status: st };
+          });
+          const passed = results.filter(r => r.status === 'PASS').length;
+          const amber = results.filter(r => r.status === 'AMBER').length;
+          const score = Math.round(((passed + amber * 0.5) / results.length) * 100);
+          setQsraResults({
+            projectName: projectName || 'Analysis',
+            dataDate,
+            healthScore: score,
+            checks: results,
+            fitness: score >= 80 ? 'Fit for prospective' : score >= 60 ? 'Fit for retrospective' : 'At risk'
+          });
+          setAnalyzing(false);
+          return 100;
+        }
+        return p + 12.5;
+      });
+    }, 250);
+  };
+
+  const runDCMA = () => {
+    setAnalyzing(true);
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(p => {
+        if (p >= 100) {
+          clearInterval(interval);
+          const results = dcmaChecks.map(ck => {
+            const rand = Math.random();
+            const val = Math.round(rand * 10);
+            const st = rand > 0.5 ? 'PASS' : 'WARNING';
+            return { id: ck.id, name: ck.name, threshold: ck.threshold, value: val, status: st };
+          });
+          const passed = results.filter(r => r.status === 'PASS').length;
+          setDcmaResults({
+            projectName: projectName || 'Analysis',
+            dataDate,
+            score: Math.round((passed / 14) * 100),
+            checks: results,
+            compliance: passed >= 12 ? 'COMPLIANT' : passed >= 10 ? 'MARGINAL' : 'NON-COMPLIANT'
+          });
+          setAnalyzing(false);
+          return 100;
+        }
+        return p + 7.14;
+      });
+    }, 120);
+  };
+
+  return (
+    <div style={{ padding: 24, fontFamily: 'monospace' }}>
+      <span style={{ fontSize: 9, color: c.text.muted }}>PLANNING INTELLIGENCE</span>
+      <h2 style={{ fontSize: 18, color: c.text.primary, margin: '6px 0' }}>Analysis Tools</h2>
+      <p style={{ fontSize: 10, color: c.text.secondary, marginBottom: 20 }}>QSRA Schedule Health Check • DCMA 14-Point Assessment</p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {tabs.map(t => {
+          const Icon = t.icon;
+          const active = toolsTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setToolsTab(t.id)}
+              style={{
+                padding: '10px 16px',
+                background: active ? 'rgba(160,128,64,0.15)' : c.bg.card,
+                border: `1px solid ${active ? c.accent.dim : c.border.default}`,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Icon size={12} color={active ? c.accent.primary : c.text.muted} />
+              <span style={{ fontSize: 9, color: active ? c.accent.primary : c.text.primary }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}>
+          <span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 12 }}>INPUT</span>
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder="Project Name"
+            style={{ width: '100%', padding: 10, marginBottom: 10, background: c.bg.secondary, border: `1px solid ${c.border.default}`, color: c.text.primary, fontSize: 10, fontFamily: 'monospace' }}
+          />
+          <input
+            type="date"
+            value={dataDate}
+            onChange={(e) => setDataDate(e.target.value)}
+            style={{ width: '100%', padding: 10, marginBottom: 12, background: c.bg.secondary, border: `1px solid ${c.border.default}`, color: c.text.primary, fontSize: 10, fontFamily: 'monospace' }}
+          />
+
+          {toolsTab === 'qsra' ? (
+            <button
+              onClick={runQSRA}
+              disabled={analyzing}
+              style={{ width: '100%', padding: 14, background: analyzing ? c.bg.secondary : c.accent.primary, border: 'none', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: 10, color: analyzing ? c.text.muted : c.bg.primary }}>{analyzing ? `ANALYZING... ${Math.round(progress)}%` : 'RUN QSRA ANALYSIS'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={runDCMA}
+              disabled={analyzing}
+              style={{ width: '100%', padding: 14, background: analyzing ? c.bg.secondary : c.accent.primary, border: 'none', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: 10, color: analyzing ? c.text.muted : c.bg.primary }}>{analyzing ? `ANALYZING... ${Math.round(progress)}%` : 'RUN DCMA ANALYSIS'}</span>
+            </button>
+          )}
+
+          {analyzing && (
+            <div style={{ marginTop: 12, height: 4, background: c.border.default }}>
+              <motion.div animate={{ width: progress + '%' }} style={{ height: '100%', background: c.accent.primary }} />
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}>
+          <span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 12 }}>
+            {toolsTab === 'qsra' ? 'HEALTH SCORE' : 'COMPLIANCE SCORE'}
+          </span>
+
+          {toolsTab === 'qsra' ? (
+            qsraResults ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 56, color: qsraResults.healthScore >= 80 ? c.status.active : qsraResults.healthScore >= 60 ? c.status.warning : c.status.critical }}>{qsraResults.healthScore}</span>
+                  <span style={{ fontSize: 16, color: c.text.muted }}>/100</span>
+                </div>
+                <div style={{ padding: 12, background: c.bg.secondary }}>
+                  <span style={{ fontSize: 9, color: c.text.muted }}>FITNESS: </span>
+                  <span style={{ fontSize: 10, color: c.status.active }}>{qsraResults.fitness}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 32, textAlign: 'center' }}>
+                <HelpCircle size={32} color={c.text.muted} />
+                <p style={{ fontSize: 11, color: c.text.muted, marginTop: 12 }}>Run analysis to see results</p>
+              </div>
+            )
+          ) : (
+            dcmaResults ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 56, color: dcmaResults.score >= 85 ? c.status.active : dcmaResults.score >= 70 ? c.status.warning : c.status.critical }}>{dcmaResults.score}</span>
+                  <span style={{ fontSize: 16, color: c.text.muted }}>/100</span>
+                </div>
+                <div style={{ padding: 12, background: dcmaResults.compliance === 'COMPLIANT' ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', border: `1px solid ${dcmaResults.compliance === 'COMPLIANT' ? c.status.active : c.status.warning}` }}>
+                  <span style={{ fontSize: 12, color: dcmaResults.compliance === 'COMPLIANT' ? c.status.active : c.status.warning }}>{dcmaResults.compliance}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 32, textAlign: 'center' }}>
+                <Shield size={32} color={c.text.muted} />
+                <p style={{ fontSize: 11, color: c.text.muted, marginTop: 12 }}>Run analysis to see results</p>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {toolsTab === 'qsra' && qsraResults && (
+        <div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}>
+          <span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 16 }}>ASSESSMENT RESULTS</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {qsraResults.checks.map(ck => {
+              const col = ck.status === 'PASS' ? c.status.active : ck.status === 'AMBER' ? c.status.warning : c.status.critical;
+              return (
+                <div key={ck.id} style={{ padding: 12, background: c.bg.secondary, borderLeft: `3px solid ${col}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: c.text.primary }}>{ck.id}. {ck.name}</span>
+                    <span style={{ fontSize: 8, padding: '2px 6px', background: col + '33', color: col }}>{ck.status}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 8, color: c.text.dim }}>Target: {ck.threshold}</span>
+                    <span style={{ fontSize: 8, color: c.text.secondary }}>Actual: {ck.value}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {toolsTab === 'dcma' && dcmaResults && (
+        <div style={{ padding: 20, background: c.bg.card, border: `1px solid ${c.border.default}` }}>
+          <span style={{ fontSize: 9, color: c.text.muted, display: 'block', marginBottom: 16 }}>14-POINT RESULTS</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {dcmaResults.checks.map(ck => {
+              const col = ck.status === 'PASS' ? c.status.active : c.status.warning;
+              return (
+                <div key={ck.id} style={{ padding: 12, background: c.bg.secondary, borderLeft: `3px solid ${col}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: c.text.primary }}>{ck.id}. {ck.name}</span>
+                    <span style={{ fontSize: 8, color: col }}>{ck.status}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 function AIAssistant() {
   const { aiOpen, setAiOpen, setSection } = useCtx();
