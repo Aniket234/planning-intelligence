@@ -1315,4 +1315,3 @@ export default function App() {
     </Provider>
   );
 }
-
