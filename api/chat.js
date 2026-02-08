@@ -23,9 +23,20 @@ module.exports = async (req, res) => {
     const parsed = body ? JSON.parse(body) : {};
     const system = parsed.system || '';
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+    const meta = parsed.meta || {};
+    const context = parsed.context || {};
+
+    // Provide grounded context to the model in a dedicated user message.
+    // Keep it compact to avoid huge tokens.
+    const ctxStr = JSON.stringify({ meta, context }, null, 2);
+    const ctxMsg = {
+      role: 'user',
+      content: `CONTEXT_JSON (use as grounding; do not invent facts beyond this):\n${ctxStr.slice(0, 20000)}`
+    };
 
     const input = [
       ...(system ? [{ role: 'system', content: system }] : []),
+      ctxMsg,
       ...messages,
     ];
 
@@ -36,7 +47,8 @@ module.exports = async (req, res) => {
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        // You can switch models in Vercel env or by editing this string.
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         input,
         temperature: 0.2,
       }),
