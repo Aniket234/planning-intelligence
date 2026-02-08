@@ -3,9 +3,19 @@
 // Uses OpenAI Responses API: https://platform.openai.com/docs/api-reference/responses
 module.exports = async (req, res) => {
   try {
+    // Basic CORS + preflight (safe even if same-origin)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
     if (req.method !== 'POST') {
       res.statusCode = 405;
-      return res.end('Method Not Allowed');
+      return res.json({ error: 'Method Not Allowed' });
     }
 
     const key = process.env.OPENAI_API_KEY;
