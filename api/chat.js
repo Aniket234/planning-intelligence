@@ -58,9 +58,10 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         // You can switch models in Vercel env or by editing this string.
-        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         input,
-        temperature: 0.2,
+        temperature: 0.3,
+        max_output_tokens: 900,
       }),
     });
 
